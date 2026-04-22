@@ -124,12 +124,12 @@ function formatQuota(value: number) {
 
 function formatRestoreAt(value?: string | null) {
   if (!value) {
-    return { absolute: "—", relative: "" };
+    return { absolute: "—", absoluteShort: "—", relative: "" };
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return { absolute: value, relative: "" };
+    return { absolute: value, absoluteShort: value, relative: "" };
   }
 
   const diffMs = Math.max(0, date.getTime() - Date.now());
@@ -139,11 +139,12 @@ function formatRestoreAt(value?: string | null) {
   const relative = diffMs > 0 ? `剩余 ${days}d ${hours}h` : "已到恢复时间";
 
   const pad = (num: number) => String(num).padStart(2, "0");
-  const absolute = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+  const absoluteShort = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
     date.getHours(),
-  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  )}:${pad(date.getMinutes())}`;
+  const absolute = `${absoluteShort}:${pad(date.getSeconds())}`;
 
-  return { absolute, relative };
+  return { absolute, absoluteShort, relative };
 }
 
 function formatQuotaSummary(accounts: Account[]) {
@@ -936,16 +937,15 @@ export default function AccountsPage() {
                         onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
                       />
                     </th>
-                    <th className="w-52 px-4 py-3">token</th>
-                    <th className="w-28 px-4 py-3">类型</th>
-                    <th className="w-24 px-4 py-3">状态</th>
-                    <th className="w-28 px-4 py-3">同步</th>
-                    <th className="w-56 px-4 py-3">账号信息</th>
-                    <th className="w-32 px-4 py-3">图片额度</th>
-                    <th className="w-44 px-4 py-3">图片重置</th>
-                    <th className="w-18 px-4 py-3">成功</th>
-                    <th className="w-18 px-4 py-3">失败</th>
-                    <th className="w-24 px-4 py-3">操作</th>
+                    <th className="w-80 px-4 py-3 whitespace-nowrap">账号 / Token</th>
+                    <th className="w-28 px-4 py-3 whitespace-nowrap">类型</th>
+                    <th className="w-24 px-4 py-3 whitespace-nowrap">状态</th>
+                    <th className="w-28 px-4 py-3 whitespace-nowrap">同步</th>
+                    <th className="w-32 px-4 py-3 whitespace-nowrap">图片额度</th>
+                    <th className="w-44 px-4 py-3 whitespace-nowrap">图片重置</th>
+                    <th className="w-18 px-4 py-3 whitespace-nowrap">成功</th>
+                    <th className="w-18 px-4 py-3 whitespace-nowrap">失败</th>
+                    <th className="w-24 px-4 py-3 whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -978,7 +978,7 @@ export default function AccountsPage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="font-medium tracking-tight text-stone-700">
                               {maskToken(account.access_token)}
                             </span>
@@ -993,14 +993,26 @@ export default function AccountsPage() {
                               <Copy className="size-4" />
                             </button>
                           </div>
-                          <div className="mt-1 text-xs text-stone-400">{account.fileName}</div>
+                          <div className="mt-1 space-y-0.5 text-xs">
+                            <div className="truncate text-stone-500" title={account.email ?? ""}>
+                              {account.email ?? "—"}
+                            </div>
+                            <div className="truncate text-stone-400" title={account.fileName}>
+                              {account.fileName}
+                            </div>
+                            {account.note ? (
+                              <div className="truncate text-stone-400" title={account.note}>
+                                {account.note}
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <Badge variant="secondary" className="rounded-md bg-stone-100 text-stone-700">
                             {account.type}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <Badge
                             variant={status.badge}
                             className="inline-flex items-center gap-1 rounded-md px-2 py-1"
@@ -1009,7 +1021,7 @@ export default function AccountsPage() {
                             {account.status}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {syncState ? (
                             <Badge variant={syncMeta[syncState].badge} className="rounded-md px-2 py-1">
                               {syncMeta[syncState].label}
@@ -1017,10 +1029,6 @@ export default function AccountsPage() {
                           ) : (
                             <span className="text-xs text-stone-400">—</span>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs leading-5 text-stone-500">{account.email ?? "—"}</div>
-                          {account.note ? <div className="mt-1 text-xs text-stone-400">{account.note}</div> : null}
                         </td>
                         <td className="px-4 py-3">
                           <div className="space-y-2">
@@ -1040,16 +1048,24 @@ export default function AccountsPage() {
                             <div className="text-[11px] text-stone-400">本地额度 {formatQuota(account.quota)}</div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs leading-5 text-stone-500">
-                          <div className="space-y-0.5">
-                            {imageGenRestore.relative ? (
-                              <div className="font-medium text-stone-700">{imageGenRestore.relative}</div>
-                            ) : null}
-                            <div>{imageGenRestore.absolute}</div>
-                          </div>
+                        <td className="px-4 py-3 text-xs text-stone-500 whitespace-nowrap">
+                          {imageGenRestore.relative ? (
+                            <div
+                              className="flex items-center gap-2"
+                              title={imageGenRestore.absolute !== "—" ? imageGenRestore.absolute : undefined}
+                            >
+                              <span className="font-medium text-stone-700">{imageGenRestore.relative}</span>
+                              <span className="text-stone-300">·</span>
+                              <span className="font-mono tabular-nums text-stone-400">{imageGenRestore.absoluteShort}</span>
+                            </div>
+                          ) : (
+                            <div className="truncate font-mono tabular-nums text-stone-400" title={imageGenRestore.absolute}>
+                              {imageGenRestore.absoluteShort}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-stone-500">{account.success}</td>
-                        <td className="px-4 py-3 text-stone-500">{account.fail}</td>
+                        <td className="px-4 py-3 text-stone-500 whitespace-nowrap">{account.success}</td>
+                        <td className="px-4 py-3 text-stone-500 whitespace-nowrap">{account.fail}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 text-stone-400">
                             <button
