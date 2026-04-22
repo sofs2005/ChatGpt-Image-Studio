@@ -910,21 +910,21 @@ export default function AccountsPage() {
               <table className="w-full min-w-[1120px] text-left">
                 <thead className="border-b border-stone-100 text-[11px] text-stone-400 uppercase tracking-[0.18em]">
                   <tr>
-                    <th className="w-12 px-4 py-3">
+                    <th className="w-12 px-4 py-3 text-center">
                       <Checkbox
                         checked={allCurrentSelected}
                         onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
                       />
                     </th>
                     <th className="w-80 px-4 py-3 whitespace-nowrap">账号 / Token</th>
-                    <th className="w-28 px-4 py-3 whitespace-nowrap">类型</th>
-                    <th className="w-24 px-4 py-3 whitespace-nowrap">状态</th>
-                    <th className="w-28 px-4 py-3 whitespace-nowrap">同步</th>
-                    <th className="w-32 px-4 py-3 whitespace-nowrap">图片额度</th>
-                    <th className="w-44 px-4 py-3 whitespace-nowrap">图片重置</th>
-                    <th className="w-18 px-4 py-3 whitespace-nowrap">成功</th>
-                    <th className="w-18 px-4 py-3 whitespace-nowrap">失败</th>
-                    <th className="w-24 px-4 py-3 whitespace-nowrap">操作</th>
+                    <th className="w-28 px-4 py-3 text-center whitespace-nowrap">类型</th>
+                    <th className="w-24 px-4 py-3 text-center whitespace-nowrap">状态</th>
+                    <th className="w-28 px-4 py-3 text-center whitespace-nowrap">同步</th>
+                    <th className="w-32 px-4 py-3 text-center whitespace-nowrap">图片额度</th>
+                    <th className="w-44 px-4 py-3 text-center whitespace-nowrap">图片重置</th>
+                    <th className="w-18 px-4 py-3 text-center whitespace-nowrap">成功</th>
+                    <th className="w-18 px-4 py-3 text-center whitespace-nowrap">失败</th>
+                    <th className="w-24 px-4 py-3 text-center whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -943,7 +943,7 @@ export default function AccountsPage() {
                         key={account.id}
                         className="border-b border-stone-100/80 text-sm text-stone-600 transition-colors hover:bg-stone-50/70"
                       >
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center">
                           <Checkbox
                             checked={selectedIds.includes(account.id)}
                             onCheckedChange={(checked) => {
@@ -985,12 +985,12 @@ export default function AccountsPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           <Badge variant="secondary" className="rounded-md bg-stone-100 text-stone-700">
                             {account.type}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           <Badge
                             variant={status.badge}
                             className="inline-flex items-center gap-1 rounded-md px-2 py-1"
@@ -999,7 +999,7 @@ export default function AccountsPage() {
                             {account.status}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {syncState ? (
                             <Badge variant={syncMeta[syncState].badge} className="rounded-md px-2 py-1">
                               {syncMeta[syncState].label}
@@ -1008,8 +1008,8 @@ export default function AccountsPage() {
                             <span className="text-xs text-stone-400">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="space-y-2">
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex flex-col items-center gap-2">
                             <div className="flex items-center gap-2">
                               <Badge variant="info" className="rounded-md">
                                 {imageGenRemaining == null ? "—" : formatQuota(imageGenRemaining)}
@@ -1026,10 +1026,10 @@ export default function AccountsPage() {
                             <div className="text-[11px] text-stone-400">本地额度 {formatQuota(account.quota)}</div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-stone-500 whitespace-nowrap">
+                        <td className="px-4 py-3 text-center text-xs text-stone-500 whitespace-nowrap">
                           {imageGenRestore.relative ? (
                             <div
-                              className="flex items-center gap-2"
+                              className="flex items-center justify-center gap-2"
                               title={imageGenRestore.absolute !== "—" ? imageGenRestore.absolute : undefined}
                             >
                               <span className="font-medium text-stone-700">{imageGenRestore.relative}</span>
@@ -1042,10 +1042,10 @@ export default function AccountsPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-stone-500 whitespace-nowrap">{account.success}</td>
-                        <td className="px-4 py-3 text-stone-500 whitespace-nowrap">{account.fail}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1 text-stone-400">
+                        <td className="px-4 py-3 text-center text-stone-500 whitespace-nowrap">{account.success}</td>
+                        <td className="px-4 py-3 text-center text-stone-500 whitespace-nowrap">{account.fail}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1 text-stone-400">
                             <button
                               type="button"
                               className="rounded-lg p-2 transition hover:bg-stone-100 hover:text-stone-700"

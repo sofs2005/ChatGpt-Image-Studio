@@ -15,6 +15,7 @@ import {
   MessageSquarePlus,
   PanelLeftClose,
   PanelLeftOpen,
+  RotateCcw,
   Sparkles,
   Trash2,
   Upload,
@@ -113,9 +114,10 @@ const inspirationExamples: Array<{
   },
   {
     id: "editorial-fashion",
-    title: "时尚杂志封面",
-    prompt: "生成一张时尚杂志封面风格的人像图，主体半身居中，背景极简，色调统一，字体排版预留空间，整体克制、现代、有高级编辑感。",
-    hint: "适合封面、人像 KV、品牌主视觉。",
+    title: "周芷若联动宣传图",
+    prompt:
+      "《倚天屠龙记》周芷若的维秘联动活动宣传图，人物占画面 80% 以上，周芷若在古风古城城墙上，优雅侧身回眸姿态，突出古典美人身姿曲线， 穿着维秘联动款：融合古风元素的蕾丝吊带裙，搭配精致吊带丝袜（黑色或淡青色，带有轻微古风刺绣），丝袜包裹修长双腿，整体造型唯美古典， 高品质真人级 3D 古风游戏截图风格，电影级光影，周芷若清丽绝俗、长发微散，眼神柔美回眸，轻纱飘逸， 背景为夜晚古城墙，青砖城垛、灯笼照明、月光洒落，古建筑灯火点点，氛围梦幻唯美， 高细节，8K 品质，精致渲染，真实丝袜质感，电影级构图，光影细腻，古典武侠风",
+    hint: "适合古风角色联动、游戏活动主视觉、电影感人物宣传图。",
     model: "gpt-image-2",
     count: 1,
     tone: "from-zinc-900 via-rose-800 to-amber-500",
@@ -653,6 +655,17 @@ export default function ImagePage() {
     };
   }, [mode, pendingPickerMode]);
 
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    const maxHeight = Math.min(480, Math.max(260, Math.floor(window.innerHeight * 0.42)));
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+  }, [imagePrompt, mode]);
+
   const persistConversation = async (conversation: ImageConversation) => {
     const normalizedConversation = normalizeConversation(conversation);
     await saveImageConversation(normalizedConversation);
@@ -1017,6 +1030,191 @@ export default function ImagePage() {
                 })),
               }
             : turn,
+        ),
+      }));
+      toast.error(message);
+    } finally {
+      finishImageTask(conversationId, turnId);
+      setIsSubmitting(false);
+      setActiveRequest(null);
+      setSubmitStartedAt(null);
+    }
+  };
+
+  const handleRetryTurn = async (conversationId: string, turn: ImageConversationTurn) => {
+    if (isSubmitting) {
+      toast.error("正在处理中，请稍后再试");
+      return;
+    }
+
+    const prompt = turn.prompt?.trim() ?? "";
+    const turnMode = turn.mode || "generate";
+    const turnSourceImages = Array.isArray(turn.sourceImages) ? turn.sourceImages : [];
+    const turnImageSources = turnSourceImages.filter((item) => item.role === "image");
+    const turnMaskSource = turnSourceImages.find((item) => item.role === "mask") ?? null;
+    const turnScale = turnMode === "upscale" ? turn.scale || "2x" : undefined;
+    const expectedCount = Math.max(1, turn.count || 1);
+
+    if (turnMode === "generate" && !prompt) {
+      toast.error("该记录缺少提示词，无法重试");
+      return;
+    }
+    if ((turnMode === "edit" || turnMode === "upscale") && turnImageSources.length === 0) {
+      toast.error("该记录缺少源图，无法重试");
+      return;
+    }
+
+    const turnId = makeId();
+    const now = new Date().toISOString();
+    const draftTurn = createConversationTurn({
+      turnId,
+      title: buildConversationTitle(turnMode, prompt, turnScale || upscaleScale),
+      mode: turnMode,
+      prompt,
+      model: turn.model,
+      count: expectedCount,
+      scale: turnScale,
+      sourceImages: turnSourceImages,
+      images: createLoadingImages(expectedCount, turnId),
+      createdAt: now,
+      status: "generating",
+    });
+
+    const startedAt = Date.now();
+    setIsSubmitting(true);
+    setActiveRequest({
+      conversationId,
+      turnId,
+      mode: turnMode,
+      count: expectedCount,
+      variant: "standard",
+    });
+    setSubmitElapsedSeconds(0);
+    setSubmitStartedAt(startedAt);
+    setSelectedConversationId(conversationId);
+    startImageTask({
+      conversationId,
+      turnId,
+      mode: turnMode,
+      count: expectedCount,
+      variant: "standard",
+      startedAt,
+    });
+
+    try {
+      await updateConversation(conversationId, (current) => ({
+        ...(current ?? {
+          id: conversationId,
+          title: draftTurn.title,
+          mode: draftTurn.mode,
+          prompt: draftTurn.prompt,
+          model: draftTurn.model,
+          count: draftTurn.count,
+          scale: draftTurn.scale,
+          sourceImages: draftTurn.sourceImages,
+          images: draftTurn.images,
+          createdAt: draftTurn.createdAt,
+          status: draftTurn.status,
+          error: draftTurn.error,
+          turns: [draftTurn],
+        }),
+        turns: [...(current?.turns ?? []), draftTurn],
+      }));
+
+      let resultItems: StoredImage[] = [];
+      if (turnMode === "generate") {
+        if (turnImageSources.length > 0) {
+          const files = await Promise.all(
+            turnImageSources.map((item, index) => dataUrlToFile(item.dataUrl, item.name || `reference-${index + 1}.png`)),
+          );
+          const data = await editImage({ prompt, images: files, model: turn.model });
+          resultItems = mergeResultImages(turnId, data.data || [], 1);
+        } else {
+          const data = await generateImage(prompt, turn.model, expectedCount);
+          resultItems = mergeResultImages(turnId, data.data || [], expectedCount);
+        }
+      }
+
+      if (turnMode === "edit") {
+        const files = await Promise.all(
+          turnImageSources.map((item, index) => dataUrlToFile(item.dataUrl, item.name || `image-${index + 1}.png`)),
+        );
+        const mask = turnMaskSource ? await dataUrlToFile(turnMaskSource.dataUrl, turnMaskSource.name || "mask.png") : null;
+        const data = await editImage({ prompt, images: files, mask, model: turn.model });
+        resultItems = mergeResultImages(turnId, data.data || [], 1);
+      }
+
+      if (turnMode === "upscale") {
+        const file = await dataUrlToFile(turnImageSources[0].dataUrl, turnImageSources[0].name || "upscale.png");
+        const data = await upscaleImage({ image: file, prompt, scale: turnScale || "2x", model: turn.model });
+        resultItems = mergeResultImages(turnId, data.data || [], 1);
+      }
+
+      const failedCount = countFailures(resultItems);
+      await updateConversation(conversationId, (current) => ({
+        ...(current ?? {
+          id: conversationId,
+          title: draftTurn.title,
+          mode: draftTurn.mode,
+          prompt: draftTurn.prompt,
+          model: draftTurn.model,
+          count: draftTurn.count,
+          scale: draftTurn.scale,
+          sourceImages: draftTurn.sourceImages,
+          images: draftTurn.images,
+          createdAt: draftTurn.createdAt,
+          status: draftTurn.status,
+          error: draftTurn.error,
+          turns: [draftTurn],
+        }),
+        turns: (current?.turns ?? [draftTurn]).map((item) =>
+          item.id === turnId
+            ? {
+                ...item,
+                images: resultItems,
+                status: failedCount > 0 ? "error" : "success",
+                error: failedCount > 0 ? `其中 ${failedCount} 张处理失败` : undefined,
+              }
+            : item,
+        ),
+      }));
+
+      if (failedCount > 0) {
+        toast.error(`已返回结果，但有 ${failedCount} 张处理失败`);
+      } else {
+        toast.success(turnMode === "generate" ? "图片已生成" : turnMode === "edit" ? "图片已编辑" : "图片已放大");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "处理图片失败";
+      await updateConversation(conversationId, (current) => ({
+        ...(current ?? {
+          id: conversationId,
+          title: draftTurn.title,
+          mode: draftTurn.mode,
+          prompt: draftTurn.prompt,
+          model: draftTurn.model,
+          count: draftTurn.count,
+          scale: draftTurn.scale,
+          sourceImages: draftTurn.sourceImages,
+          images: draftTurn.images,
+          createdAt: draftTurn.createdAt,
+          status: draftTurn.status,
+          error: draftTurn.error,
+          turns: [draftTurn],
+        }),
+        turns: (current?.turns ?? [draftTurn]).map((item) =>
+          item.id === turnId
+            ? {
+                ...item,
+                status: "error",
+                error: message,
+                images: item.images.map((image) => ({
+                  ...image,
+                  status: "error" as const,
+                  error: message,
+                })),
+              }
+            : item,
         ),
       }));
       toast.error(message);
@@ -1488,29 +1686,6 @@ export default function ImagePage() {
                         </span>
                       </div>
 
-                      {turnProcessing && processingStatus ? (
-                        <div className="rounded-[28px] border border-stone-200 bg-white px-5 py-4 shadow-sm">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-start gap-3">
-                              <span className="relative mt-1 flex size-3 shrink-0">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-                                <span className="relative inline-flex size-3 rounded-full bg-emerald-500" />
-                              </span>
-                              <div>
-                                <div className="text-sm font-semibold text-stone-900">
-                                  {processingStatus.title}
-                                  {waitingDots}
-                                </div>
-                                <div className="mt-1 text-xs leading-6 text-stone-500">{processingStatus.detail}</div>
-                              </div>
-                            </div>
-                            <span className="rounded-full bg-stone-100 px-3 py-1.5 text-[11px] font-medium text-stone-600">
-                              已等待 {formatProcessingDuration(submitElapsedSeconds)}
-                            </span>
-                          </div>
-                        </div>
-                      ) : null}
-
                       {turn.images.length > 0 ? (
                         <div
                           className={cn(
@@ -1576,8 +1751,22 @@ export default function ImagePage() {
                                   </div>
                                 </div>
                               ) : image.status === "error" ? (
-                                <div className="flex min-h-[320px] items-center justify-center bg-rose-50 px-6 py-8 text-center text-sm leading-7 text-rose-600">
-                                  {image.error || "处理失败"}
+                                <div className="flex min-h-[320px] flex-col">
+                                  <div className="flex flex-1 items-center justify-center bg-rose-50 px-6 py-8 text-center text-sm leading-7 text-rose-600">
+                                    {image.error || "处理失败"}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 px-4 py-3">
+                                    <button
+                                      type="button"
+                                      className="inline-flex size-9 items-center justify-center rounded-full border border-stone-200 bg-white text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                      onClick={() => void handleRetryTurn(selectedConversation.id, turn)}
+                                      disabled={isSubmitting}
+                                      title={isSubmitting ? "处理中" : "重试"}
+                                      aria-label="重试"
+                                    >
+                                      <RotateCcw className="size-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-stone-50 px-6 py-8 text-center text-stone-500">
@@ -1598,12 +1787,6 @@ export default function ImagePage() {
                               )}
                             </div>
                           ))}
-                        </div>
-                      ) : null}
-
-                      {turn.error ? (
-                        <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-700">
-                          {turn.error}
                         </div>
                       ) : null}
                     </div>
@@ -1691,27 +1874,6 @@ export default function ImagePage() {
                 textareaRef.current?.focus();
               }}
             >
-              {(mode === "edit" || mode === "upscale") && imageSources.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    uploadInputRef.current?.click();
-                  }}
-                  className="flex w-full items-center justify-between border-b border-dashed border-stone-200 bg-white/70 px-4 py-4 text-left transition hover:bg-white"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-stone-800">
-                      {mode === "edit" ? "先上传要编辑的源图" : "先上传要放大的图片"}
-                    </div>
-                    <div className="mt-1 text-xs leading-5 text-stone-500">
-                      {mode === "edit" ? "支持拖拽、点击或粘贴图片，上传后再描述修改方向。" : "上传后可以补充想增强的方向，也可以直接发送。"}
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-stone-950 px-3 py-1.5 text-xs font-medium text-white">上传图片</span>
-                </button>
-              ) : null}
-
               {sourceImages.length > 0 ? (
                 <div className="hide-scrollbar flex gap-3 overflow-x-auto border-b border-stone-200 px-4 py-3">
                   {sourceImages.map((item) => (
@@ -1747,7 +1909,7 @@ export default function ImagePage() {
                 </div>
               ) : null}
 
-              <div className="relative px-4 py-3">
+              <div className="px-4 pb-2 pt-3">
                 <Textarea
                   ref={textareaRef}
                   value={imagePrompt}
@@ -1768,22 +1930,24 @@ export default function ImagePage() {
                       }
                     }
                   }}
-                  className="min-h-[82px] resize-none border-0 bg-transparent !px-1 !pt-1 !pb-12 text-[15px] leading-7 text-stone-900 shadow-none placeholder:text-stone-400 focus-visible:ring-0"
+                  className="min-h-[92px] max-h-[480px] resize-none border-0 bg-transparent !px-1 !pt-1 !pb-1 text-[15px] leading-7 text-stone-900 shadow-none placeholder:text-stone-400 focus-visible:ring-0 overflow-y-auto"
                 />
-                <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
+              </div>
+              <div className="px-4 pb-4 pt-2">
+                <div className="flex items-end justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-9 rounded-full border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 shadow-none"
+                      className="h-8 rounded-full border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 shadow-none"
                       onClick={(event) => {
                         event.stopPropagation();
                         uploadInputRef.current?.click();
                       }}
                     >
-                      <ImagePlus className="size-4" />
-                      {mode === "generate" ? "添加参考图" : "上传源图"}
+                      <ImagePlus className="size-3.5" />
+                      {mode === "generate" ? "上传参考图" : "上传源图"}
                     </Button>
 
                     {mode === "edit" ? (
@@ -1791,13 +1955,13 @@ export default function ImagePage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-9 rounded-full border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 shadow-none"
+                        className="h-8 rounded-full border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 shadow-none"
                         onClick={(event) => {
                           event.stopPropagation();
                           maskInputRef.current?.click();
                         }}
                       >
-                        <Upload className="size-4" />
+                        <Upload className="size-3.5" />
                         遮罩
                       </Button>
                     ) : null}
@@ -1807,7 +1971,7 @@ export default function ImagePage() {
                     type="button"
                     onClick={() => void handleSubmit()}
                     disabled={isSubmitting}
-                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-stone-950 text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-stone-950 text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
                     aria-label="提交图片任务"
                   >
                     {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
