@@ -23,7 +23,7 @@ WORKDIR /app/backend
 
 COPY --from=backend-builder /out/chatgpt2api-studio /app/backend/chatgpt2api-studio
 COPY backend/data/config.defaults.toml /app/backend/data/config.defaults.toml
-COPY --from=web-builder /workspace/web/out /app/web/out
+COPY --from=web-builder /workspace/web/dist/. /app/backend/static/
 
 RUN mkdir -p /app/backend/data/auths /app/backend/data/sync_state /app/backend/data/tmp/image
 
