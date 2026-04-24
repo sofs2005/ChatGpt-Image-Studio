@@ -14,18 +14,24 @@ COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 COPY backend/ ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/chatgpt2api-studio .
+ARG VERSION=dev
+ARG COMMIT=none
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build \
+      -ldflags="-s -w -X chatgpt2api/internal/buildinfo.Version=${VERSION} -X chatgpt2api/internal/buildinfo.Commit=${COMMIT} -X chatgpt2api/internal/buildinfo.BuildTime=${BUILD_TIME}" \
+      -o /out/chatgpt2api-studio .
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
 
-WORKDIR /app/backend
+WORKDIR /app
 
-COPY --from=backend-builder /out/chatgpt2api-studio /app/backend/chatgpt2api-studio
-COPY backend/internal/config/config.defaults.toml /app/backend/data/config.defaults.toml
-COPY --from=web-builder /workspace/web/dist/. /app/backend/static/
+COPY --from=backend-builder /out/chatgpt2api-studio /app/chatgpt2api-studio
+COPY backend/internal/config/config.defaults.toml /app/data/config.example.toml
+COPY --from=web-builder /workspace/web/dist /app/static
 
-RUN mkdir -p /app/backend/data/auths /app/backend/data/sync_state /app/backend/data/tmp/image
+RUN mkdir -p /app/data/auths /app/data/sync_state /app/data/tmp/image
 
 EXPOSE 7000
 

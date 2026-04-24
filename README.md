@@ -96,6 +96,61 @@ chmod +x ./scripts/*.sh
 
 - `GET /health`
 
+## Docker 部署
+
+当前仓库支持通过 GitHub Container Registry 直接拉取镜像部署。
+
+### 首次启动
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+默认会：
+
+- 使用 `ghcr.io/peiyizhi0724/chatgpt-image-studio:latest`
+- 将宿主机的 `./backend/data` 挂载到容器内 `/app/data`
+- 对外暴露 `7000` 端口
+
+如需固定到某个版本，可先设置：
+
+```bash
+export IMAGE_TAG=v1.2.5
+docker compose pull
+docker compose up -d
+```
+
+Windows PowerShell：
+
+```powershell
+$env:IMAGE_TAG = "v1.2.5"
+docker compose pull
+docker compose up -d
+```
+
+### 一键更新
+
+Windows：
+
+```powershell
+./scripts/docker-update.ps1
+```
+
+macOS / Linux：
+
+```bash
+chmod +x ./scripts/docker-update.sh
+./scripts/docker-update.sh
+```
+
+更新脚本会自动执行：
+
+1. 检查 Docker / Docker Compose
+2. 如果当前目录是 Git 仓库，则先 `git pull --ff-only origin main`
+3. 从 GitHub Container Registry 拉取最新镜像
+4. 重新创建并启动容器
+
 ### 配置文件
 
 程序启动时会确保以下文件存在：

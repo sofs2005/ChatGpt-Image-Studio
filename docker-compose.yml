@@ -1,8 +1,13 @@
 services:
   studio:
+    image: ghcr.io/peiyizhi0724/chatgpt-image-studio:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VERSION: ${IMAGE_TAG:-dev}
+        COMMIT: ${IMAGE_COMMIT:-local}
+        BUILD_TIME: ${IMAGE_BUILD_TIME:-local}
     ports:
       - "7000:7000"
     environment:
@@ -10,5 +15,5 @@ services:
       SERVER_PORT: 7000
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
-      - ./backend/data:/app/backend/data
+      - ./backend/data:/app/data
     restart: unless-stopped
